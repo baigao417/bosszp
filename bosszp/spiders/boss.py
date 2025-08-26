@@ -2,6 +2,7 @@ import scrapy
 import json
 import logging
 import random
+from urllib.parse import quote
 from bosszp.items import BosszpItem
 
 
@@ -29,8 +30,6 @@ class BossSpider(scrapy.Spider):
         'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; The World)',
         'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; 360SE)',
     ]
-    page_no = 1  # 初始化分页
-
     def random_header(self):
         """
         随机生成请求头
@@ -43,7 +42,7 @@ class BossSpider(scrapy.Spider):
 
     def parse(self, response):
         """
-        解析首页热门城市列表，选择热门城市进行爬取
+        解析首页热门城市列表，选择热门城市并按岗位关键字进行爬取
         :param response: 热门城市字典数据
         :return:
         """
@@ -60,12 +59,19 @@ class BossSpider(scrapy.Spider):
         print("--->", hot_city_names)
         # 从键盘获取城市编号
         city_no = int(input('请从上述城市列表中，选择编号开始爬取：'))
-        # 拼接url https://www.zhipin.com/job_detail/?query=&city=101040100&industry=&position=
         # 获取城市编码code
         city_code = hot_city_list[city_no - 1]['code']
-        city_url = 'https://www.zhipin.com/job_detail/?query=&city={}&industry=&position='.format(city_code)
-        logging.info("<<<<<<<<<<<<<正在爬取第_{}_页岗位数据>>>>>>>>>>>>>".format(self.page_no))
-        yield scrapy.Request(url=city_url, headers=self.random_header(), callback=self.parse_city)
+        # 获取岗位关键字，支持多个关键字
+        job_input = input('请输入需要查询的岗位关键字（多个用逗号分隔）：')
+        job_list = [j.strip() for j in job_input.split(',') if j.strip()]
+        for job in job_list:
+            query = quote(job)
+            city_url = 'https://www.zhipin.com/job_detail/?query={}&city={}&industry=&position='.format(query, city_code)
+            logging.info("<<<<<<<<<<<<<正在爬取{}第_{}_页岗位数据>>>>>>>>>>>>>".format(job, 1))
+            yield scrapy.Request(url=city_url,
+                                 headers=self.random_header(),
+                                 callback=self.parse_city,
+                                 meta={'job': job, 'page_no': 1})
 
     def parse_city(self, response):
 
@@ -77,6 +83,8 @@ class BossSpider(scrapy.Spider):
         if response.status != 200:
             logging.warning("<<<<<<<<<<<<<获取城市招聘信息失败，ip已被封禁。请稍后重试>>>>>>>>>>>>>")
             return
+        job = response.meta.get('job')
+        page_no = response.meta.get('page_no', 1)
         li_elements = response.xpath('//div[@class="job-list"]/ul/li')  # 定位到所有的li标签
         next_url = response.xpath('//div[@class="page"]/a[last()]/@href').get()  # 获取下一页
 
@@ -97,10 +105,13 @@ class BossSpider(scrapy.Spider):
                               job_benefits=job_benefits)
             yield item
         if next_url == "javascript:;":
-            logging.info('<<<<<<<<<<<<<热门城市岗位数据已爬取结束>>>>>>>>>>>>>')
-            logging.info("<<<<<<<<<<<<<一共爬取了_{}_页岗位数据>>>>>>>>>>>>>".format(self.page_no))
+            logging.info('<<<<<<<<<<<<<{}岗位数据已爬取结束>>>>>>>>>>>>>'.format(job))
+            logging.info("<<<<<<<<<<<<<{}共爬取了_{}_页岗位数据>>>>>>>>>>>>>".format(job, page_no))
             return
         next_url = response.urljoin(next_url)  # 网址拼接
-        self.page_no += 1
-        logging.info("<<<<<<<<<<<<<正在爬取第_{}_页岗位数据>>>>>>>>>>>>>".format(self.page_no))
-        yield scrapy.Request(url=next_url, headers=self.random_header(), callback=self.parse_city)
+        page_no += 1
+        logging.info("<<<<<<<<<<<<<正在爬取{}第_{}_页岗位数据>>>>>>>>>>>>>".format(job, page_no))
+        yield scrapy.Request(url=next_url,
+                             headers=self.random_header(),
+                             callback=self.parse_city,
+                             meta={'job': job, 'page_no': page_no})
