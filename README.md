@@ -47,7 +47,7 @@
 
 ### 3.1 数据采集
 
-​		爬取 Boss直聘热门城市岗位数据，并将数据以 CSV 文件格式进行保存。如下图所示：
+​		爬取 Boss直聘热门城市岗位数据，并将数据以 CSV 文件格式进行保存。运行时先选择城市，再输入需要查询的岗位关键字（多个关键字可用逗号分隔）。如下图所示：
 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/20210112170341320.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2dtZXRidGdia2k=,size_16,color_FFFFFF,t_70#pic_center)
 
